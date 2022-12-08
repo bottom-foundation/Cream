@@ -95,6 +95,44 @@ NSDictionary *responseDict;
     return YES;
 }
 
+-(void)pageDoubleTapped:(UIGestureRecognizer *)gestureRecognizer {
+    NSLog(@"double tap press");
+    if (!self.navigationController.isNavigationBarHidden) {
+        [self.navigationController setNavigationBarHidden:YES animated:YES];
+    }
+    CGPoint tappedPoint= [gestureRecognizer locationInView:gestureRecognizer.view];
+    [scrollView zoomToRect:CGRectMake(tappedPoint.x/2.0, tappedPoint.y/2.0, 160.0, 160.0) animated:YES];
+}
+
+- (UIView*) viewForZoomingInScrollView: (UIScrollView*)scrollView{
+    //zoom temp, doesn't work properly atm, need to get current subview on screen
+    return scrollView.subviews[0];
+}
+
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    if (pagesLoaded < [[responseDict objectForKey:@"num_pages"]integerValue]) {
+        NSLog(@"Loading Page...");
+        MangaPageView *pageView = [[MangaPageView alloc]init];
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            UIImage *airplanes = [self imageFromGETUrl:[NSString stringWithFormat:@"https://i3.nhentai.net/galleries/%ld/%d.jpg",[[responseDict objectForKey:@"media_id"]integerValue],pagesLoaded+1]];
+            dispatch_async(dispatch_get_main_queue(), ^(void) {
+                [pageView setImage:airplanes];
+                [pageView setPageNum:pagesLoaded+1];
+                [pageView setNhentaiId:[[responseDict objectForKey:@"media_id"]integerValue]];
+                [pageView setDidLoadImage:YES];
+                [pageView setFrame:CGRectMake(self.view.frame.size.width*pagesLoaded, 0, self.view.frame.size.width, scrollView.frame.size.height)];
+                [pageView setUserInteractionEnabled:YES];
+                UITapGestureRecognizer *pageTap = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(pageTapped)];
+                [pageTap setNumberOfTapsRequired:1];
+                [pageView addGestureRecognizer:pageTap];
+                [scrollView addSubview:pageView];
+                pagesLoaded++;
+                NSLog(@"Page %d Loaded!",pagesLoaded);
+            });
+        });
+    }
+}
+
 -(UIImage*)imageWithImage:(UIImage*)image scaledToSize:(CGSize)newSize {
     UIGraphicsBeginImageContext(newSize);
     [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
